@@ -3,6 +3,10 @@ import inspect
 from arches_hip.settings import *
 from django.utils.translation import ugettext as _
 
+try:
+    from settings_local import GDAL_LIBRARY_PATH
+except ImportError:
+    pass
 
 PACKAGE_ROOT = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 PACKAGE_NAME = PACKAGE_ROOT.split(os.sep)[-1]
