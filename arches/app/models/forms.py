@@ -21,6 +21,7 @@ from django.utils import translation
 from arches.app.views.concept import get_preflabel_from_valueid
 from arches.app.models.entity import Entity
 from django.utils.translation import ugettext as _
+from django.conf import settings
 
 class ResourceForm(object):
     def __init__(self, resource):
@@ -31,6 +32,14 @@ class ResourceForm(object):
         self.icon = info['icon']
         self.resource = resource
         self.data = {}
+        
+        if resource.entityid and settings.DEBUG:
+            import os, json
+            from arches.app.search.search_engine_factory import SearchEngineFactory
+            se = SearchEngineFactory().create()
+            report_info = se.search(index='resource', id=resource.entityid)
+            with open(os.path.join(settings.PACKAGE_ROOT,'logs','current_graph.json'),'wb') as out:
+                json.dump(report_info['_source']['graph'],out,indent=1)
 
     @property
     def schema(self):
