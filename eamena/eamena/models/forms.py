@@ -855,7 +855,7 @@ class FeatureConditionAssessmentForm(ResourceForm):
             ret.append({'nodes': entity.flatten()})
 
         return ret
-
+        
     def update_nodes(self, entitytypeid, data):
         if self.schema == None:
             self.schema = Entity.get_mapping_schema(self.resource.entitytypeid)
@@ -863,12 +863,11 @@ class FeatureConditionAssessmentForm(ResourceForm):
             for newentity in value['nodes']:
                 entity = Entity()
                 entity.create_from_mapping(self.resource.entitytypeid, self.schema[newentity['entitytypeid']]['steps'], newentity['entitytypeid'], newentity['value'], newentity['entityid'])
-
                 if self.baseentity == None:
                     self.baseentity = entity
                 else:
                     self.baseentity.merge(entity)
-
+                    
     def update(self, data, files):
 
         for value in data['CONDITION_ASSESSMENT.E14']:
@@ -877,24 +876,31 @@ class FeatureConditionAssessmentForm(ResourceForm):
                     #remove the node
                     self.resource.filter(lambda entity: entity.entityid != node['entityid'])
 
+        ## step 1
         self.update_nodes('DAMAGE_STATE.E3',data)
         self.update_nodes('OVERALL_DAMAGE_SEVERITY_TYPE.E55', data)
         self.update_nodes('DAMAGE_EXTENT_TYPE.E55', data)
         self.update_nodes('RECOMMENDATION_PLAN.E100',data)
         
+        ## step 2
+        self.update_nodes('POTENTIAL_STATE_PREDICTION.XX1',data)
         self.update_nodes('RISK_PLAN.E100',data)
         
+        ## step 3
         self.update_nodes('OVERALL_CONDITION_TYPE.E55',data)
         self.update_nodes('OVERALL_PRIORITY_TYPE.E55',data)
         self.update_nodes('NEXT_ASSESSMENT_DATE_TYPE.E55',data)
         self.update_nodes('CONDITION_REMARKS_ASSIGNMENT.E13',data)
         
-        # production_entities = self.resource.find_entities_by_type_id('PRODUCTION.E12')
-
-        # if len(production_entities) > 0:
-            # self.resource.merge_at(self.baseentity, 'PRODUCTION.E12')
-        # else:
-        self.resource.merge_at(self.baseentity, self.resource.entitytypeid)
+        ## this section below is copied from the arches-HIP DistrictClassificationForm,
+        ## but after many permutations I'm not convinced that all of it is necessary. -AC
+        production_entities = self.resource.find_entities_by_type_id('CONDITION_ASSESSMENT.E14')
+        if not self.baseentity:
+            self.baseentity = self.resource
+        if len(production_entities) > 0:
+            self.resource.merge_at(self.baseentity,'CONDITION_ASSESSMENT.E14')
+        else:
+            self.resource.merge_at(self.baseentity,self.resource.entitytypeid)
         self.resource.trim()
                    
     def load(self, lang):
@@ -902,6 +908,7 @@ class FeatureConditionAssessmentForm(ResourceForm):
         self.data = {
             'data': [],
             'domains': {
+                ## step 1
                 'OVERALL_DAMAGE_SEVERITY_TYPE.E55' : Concept().get_e55_domain('OVERALL_DAMAGE_SEVERITY_TYPE.E55'),
                 'DAMAGE_EXTENT_TYPE.E55' : Concept().get_e55_domain('DAMAGE_EXTENT_TYPE.E55'),
                 'RECOMMENDATION_TYPE.E55' : Concept().get_e55_domain('RECOMMENDATION_TYPE.E55'),
@@ -913,9 +920,20 @@ class FeatureConditionAssessmentForm(ResourceForm):
                 'EFFECT_TYPE.S9' : Concept().get_e55_domain('EFFECT_TYPE.S9'),
                 'DAMAGE_TREND_TYPE.E55' : Concept().get_e55_domain('DAMAGE_TREND_TYPE.E55'),
                 
+                ## step 2
+                'POTENTIAL_IMPACT_TYPE.E55' : Concept().get_e55_domain('POTENTIAL_IMPACT_TYPE.E55'),
+                'THREAT_TYPE.E55' : Concept().get_e55_domain('THREAT_TYPE.E55'),
+                'SECONDARY_THREAT_TYPE.E55' : Concept().get_e55_domain('SECONDARY_THREAT_TYPE.E55'),
+                'THREAT_PROBABILITY_TYPE.E55' : Concept().get_e55_domain('THREAT_PROBABILITY_TYPE.E55'),
+                'RISK_SEVERITY_TYPE.E55' : Concept().get_e55_domain('RISK_SEVERITY_TYPE.E55'),
+                'RISK_EXTENT_TYPE.E55' : Concept().get_e55_domain('RISK_EXTENT_TYPE.E55'),
+                'RISK_LEVEL.I4' : Concept().get_e55_domain('RISK_LEVEL.I4'),
+                'RISK_LEVEL_CERTAINTY.I6' : Concept().get_e55_domain('RISK_LEVEL_CERTAINTY.I6'),
+                'VULNERABILITY_TYPE.E55' : Concept().get_e55_domain('VULNERABILITY_TYPE.E55'),
                 'MITIGATION_STRATEGY_TYPE.E55' : Concept().get_e55_domain('MITIGATION_STRATEGY_TYPE.E55'),
                 'MITIGATION_PRIORITY_TYPE.E55' : Concept().get_e55_domain('MITIGATION_PRIORITY_TYPE.E55'),
                 
+                ## step 3
                 'OVERALL_CONDITION_TYPE.E55' : Concept().get_e55_domain('OVERALL_CONDITION_TYPE.E55'),
                 'OVERALL_PRIORITY_TYPE.E55' : Concept().get_e55_domain('OVERALL_PRIORITY_TYPE.E55'),
                 'NEXT_ASSESSMENT_DATE_TYPE.E55' : Concept().get_e55_domain('NEXT_ASSESSMENT_DATE_TYPE.E55'),
@@ -924,13 +942,14 @@ class FeatureConditionAssessmentForm(ResourceForm):
         }
 
         assessment_entities = self.resource.find_entities_by_type_id('CONDITION_ASSESSMENT.E14')
-
+        
         for entity in assessment_entities:
 
             self.data['data'].append({
                 'CONDITION_ASSESSMENT.E14': {
                     'branch_lists': self.get_nodes(entity, 'CONDITION_ASSESSMENT.E14')
                 },
+                ## step 1
                 'DAMAGE_STATE.E3': {
                     'branch_lists': datetime_nodes_to_dates(exclude_empty_branches(self.get_nodes(entity, 'DAMAGE_STATE.E3'),'DISTURBANCE_EVENT.E5'))
                 },
@@ -944,10 +963,15 @@ class FeatureConditionAssessmentForm(ResourceForm):
                     'branch_lists': self.get_nodes(entity, 'RECOMMENDATION_PLAN.E100')
                 },
                 
+                ## step 2
+                'POTENTIAL_STATE_PREDICTION.XX1': {
+                    'branch_lists': datetime_nodes_to_dates(self.get_nodes(entity, 'POTENTIAL_STATE_PREDICTION.XX1'))
+                },
                 'RISK_PLAN.E100': {
                     'branch_lists': self.get_nodes(entity, 'RISK_PLAN.E100')
-                },                
+                },
                 
+                ## step 3
                 'OVERALL_CONDITION_TYPE.E55': {
                     'branch_lists': self.get_nodes(entity, 'OVERALL_CONDITION_TYPE.E55')
                 },
@@ -960,7 +984,6 @@ class FeatureConditionAssessmentForm(ResourceForm):
                 'CONDITION_REMARKS_ASSIGNMENT.E13': {
                     'branch_lists': self.get_nodes(entity, 'CONDITION_REMARKS_ASSIGNMENT.E13')
                 }
-                
             })
         
 class ExternalReferenceForm(ResourceForm):
