@@ -143,12 +143,15 @@ def export_results(request):
         dsl.add_filter(ids_filter)
     
     
-    search_results = dsl.search(index='entity', doc_type='')
+    search_results = dsl.scan(index='entity', doc_type='')
+    allres = []
+    for res in search_results:
+        allres.append(res)
 
     response = None
     format = request.GET.get('export', 'csv')
     exporter = ResourceExporter(format)
-    results = exporter.export(search_results['hits']['hits'])
+    results = exporter.export(allres)
     
     related_resources = [{'id1':rr.entityid1, 'id2':rr.entityid2, 'type':rr.relationshiptype} for rr in models.RelatedResource.objects.all()] 
     csv_name = 'resource_relationships.csv'
