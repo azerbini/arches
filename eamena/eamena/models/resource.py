@@ -16,11 +16,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 '''
 from django.conf import settings
+from django.contrib.gis.geos import fromstr
 import arches.app.models.models as archesmodels
 from arches.app.models.resource import Resource as ArchesResource
 from arches.app.search.search_engine_factory import SearchEngineFactory
 from arches.app.utils.betterJSONSerializer import JSONSerializer, JSONDeserializer
 from eamena.models import forms
+from arches.app.utils.date_utils import date_to_int
 from django.utils.translation import ugettext as _
 from arches.app.models.entity import Entity
 
@@ -257,3 +259,199 @@ class Resource(ArchesResource):
                 'hello_world': 'Hello World!'
             }
         }
+        
+    def prepare_documents_for_search_index(self):
+        """
+        Generates a list of specialized resource based documents to support resource search
+
+        """
+        
+        document = Entity()
+        document.property = self.property
+        document.entitytypeid = self.entitytypeid
+        document.entityid = self.entityid
+        document.value = self.value
+        document.label = self.label
+        document.businesstablename = self.businesstablename
+        document.primaryname = self.get_primary_name()
+        document.child_entities = []
+        document.dates = []
+        document.extendeddates = []
+        document.domains = []
+        document.geometries = []
+        document.numbers = []
+
+        for entity in self.flatten():
+            if entity.entityid != self.entityid:
+                if entity.businesstablename == 'domains':
+                    value = archesmodels.Values.objects.get(pk=entity.value)
+                    entity_copy = entity.copy()
+                    entity_copy.conceptid = value.conceptid_id
+                    document.domains.append(entity_copy)
+                elif entity.businesstablename == 'dates':
+                    document.dates.append(entity)
+                    document.extendeddates.append(entity)
+                elif entity.businesstablename == 'numbers':
+                    document.numbers.append(entity)
+                elif entity.businesstablename == 'geometries':
+                    entity.value = JSONDeserializer().deserialize(fromstr(entity.value).json)
+                    document.geometries.append(entity)
+                else:
+                    document.child_entities.append(entity)
+
+                if entity.entitytypeid in settings.EXTENDED_DATE_NODES:
+                    document.extendeddates.append(entity)
+
+        doc = JSONSerializer().serializeToPython(document)
+
+        # documents = super(Resource, self).prepare_documents_for_search_index()
+        # for doc in documents:
+        
+        ## index dates to extended date mapping
+        for entity in doc['extendeddates']:
+            date = date_to_int(entity['value'])
+            entity['value'] = date
+        
+        ## index dates groups to extended date groups mapping
+        doc['extendeddategroups'] = []
+        for branch,labels in settings.INDEXED_DATE_BRANCH_FORMATIONS.iteritems():
+            for nodes in self.get_nodes(branch,keys=['value']):
+                doc['extendeddategroups'].append({
+                    'value': date_to_int(nodes[labels[0]]),
+                    'conceptid': nodes[labels[1]]
+                })
+    
+        return [doc]
+        
+    def prepare_search_index(self, resource_type_id, create=False):
+        """
+        Creates the settings and mappings in Elasticsearch to support resource search
+
+        """
+        index_settings = { 
+            'settings':{
+                'analysis': {
+                    'analyzer': {
+                        'folding': {
+                            'tokenizer': 'standard',
+                            'filter':  [ 'lowercase', 'asciifolding' ]
+                        }
+                    }
+                }
+            },
+            'mappings': {
+                resource_type_id : {
+                    'properties' : {
+                        'entityid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                        'parentid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                        'property' : {'type' : 'string', 'index' : 'not_analyzed'},
+                        'entitytypeid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                        'businesstablename' : {'type' : 'string', 'index' : 'not_analyzed'},
+                        'value' : {'type' : 'string', 'index' : 'not_analyzed'},
+                        'label' : {'type' : 'string', 'index' : 'not_analyzed'},
+                        'primaryname': {'type' : 'string', 'index' : 'not_analyzed'},
+                        'child_entities' : { 
+                            'type' : 'nested', 
+                            'index' : 'analyzed',
+                            'properties' : {
+                                'entityid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'parentid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'property' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'entitytypeid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'businesstablename' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'label' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'value' : {
+                                    'type' : 'string',
+                                    'index' : 'analyzed',
+                                    'fields' : {
+                                        'raw' : { 'type' : 'string', 'index' : 'not_analyzed'},
+                                        'folded': { 'type': 'string', 'analyzer': 'folding'}
+                                    }
+                                }
+                            }
+                        },
+                        'domains' : { 
+                            'type' : 'nested', 
+                            'index' : 'analyzed',
+                            'properties' : {
+                                'entityid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'parentid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'property' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'entitytypeid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'businesstablename' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'label' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'value' : {
+                                    'type' : 'string',
+                                    'index' : 'analyzed',
+                                    'fields' : {
+                                        'raw' : { 'type' : 'string', 'index' : 'not_analyzed'}
+                                    }
+                                },
+                                'conceptid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                            }
+                        },
+                        'geometries' : { 
+                            'type' : 'nested', 
+                            'index' : 'analyzed',
+                            'properties' : {
+                                'entityid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'parentid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'property' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'entitytypeid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'businesstablename' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'label' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'value' : {
+                                    "type": "geo_shape"
+                                }
+                            }
+                        },
+                        'dates' : { 
+                            'type' : 'nested', 
+                            'index' : 'analyzed',
+                            'properties' : {
+                                'entityid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'parentid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'property' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'entitytypeid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'businesstablename' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'label' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'value' : {
+                                    "type" : "date"
+                                }
+                            }
+                        },
+                        'extendeddates' : { 
+                            'type' : 'nested', 
+                            'index' : 'analyzed',
+                            'properties' : {
+                                'entityid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'parentid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'property' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'entitytypeid' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'businesstablename' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'label' : {'type' : 'string', 'index' : 'not_analyzed'},
+                                'value' : {
+                                    'type' : 'integer'
+                                }
+                            }
+                        },
+                        'extendeddategroups' : { 
+                            'properties' : {
+                                'conceptid': {'type' : 'string', 'index' : 'not_analyzed'},
+                                'value': {'type' : 'integer', 'index' : 'not_analyzed'}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if create:
+            se = SearchEngineFactory().create()
+            try:
+                se.create_index(index='entity', body=index_settings)
+            except:
+                index_settings = index_settings['mappings']
+                se.create_mapping(index='entity', doc_type=resource_type_id, body=index_settings)
+
+        return index_settings

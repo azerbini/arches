@@ -45,8 +45,8 @@ define(['jquery',
                     dataKey: 'ARCHAEOLOGICAL_TIMESPAN.E52',
                     validateBranch: function (nodes) {
                         var ck0 = this.validateHasValues(nodes);
-                        var ck1 =vt.isValidDate(nodes,'ARCHAEOLOGICAL_FROM_DATE.E61');
-                        var ck2 =vt.isValidDate(nodes,'ARCHAEOLOGICAL_TO_DATE.E61');
+                        var ck1 = vt.validateDateEdtfy(nodes,'ARCHAEOLOGICAL_FROM_DATE.E61');
+                        var ck2 = vt.validateDateEdtfy(nodes,'ARCHAEOLOGICAL_TO_DATE.E61');
                         return ck0 && ck1&& ck2;
                     }
                 }));

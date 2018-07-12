@@ -127,25 +127,19 @@
                             <div class="col-xs-12 padding-left-1">
                                 <div class="form-group" style="width: 100%;">
                                     <div>
-                                         <div class="form-group datetimepicker" style="width:20%;">
-                                             <div class="input-group">
-                                                 <input type="text" name="mydate" id="date" placeholder='{% trans "from (yyyy-mm-dd)" %}' class="form-control datepicker" data-date-format="YYYY-MM-DD" data-bind="{value: getEditedNode('ARCHAEOLOGICAL_FROM_DATE.E61', 'value')} ">
-                                                 <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
-                                             </div>
-                                         </div>&nbsp;
-                                         <div class="form-group datetimepicker" style="width:20%;">
-                                             <div class="input-group">
-                                                 <input type="text" name="mydate" id="date" placeholder='{% trans "to (yyyy-mm-dd)" %}' class="form-control datepicker" data-date-format="YYYY-MM-DD"collapse-resource-description data-bind="{value: getEditedNode('ARCHAEOLOGICAL_TO_DATE.E61', 'value')} ">
-                                                 <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
-                                             </div>
-                                         </div>
+                                        <div class="input-group" style ="width:50%;" >
+                                            <input style="width:50%;display:inline;" type="text" id="date" placeholder="{% trans 'from' %}" class="form-control datepicker" data-date-format="YYYY/MM/DD" data-bind="{value: getEditedNode('ARCHAEOLOGICAL_FROM_DATE.E61', 'value')} ">
+                                            <input style="width:50%;display:inline;" type="text" id="date" placeholder="{% trans 'to' %}" class="form-control datepicker" data-date-format="YYYY/MM/DD" data-bind="{value: getEditedNode('ARCHAEOLOGICAL_TO_DATE.E61', 'value')} ">
+                                            
+                                        </div>
+                                        <p class="txt-color-blue">{% trans 'use "yyyy-mm-dd", "yyyy-mm", or "yyyy", and add "-" for BCE dates, e.g. "-12000"' %}</p>
                                         {% include 'views/components/add-item-button.htm' %}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </dd>
-                    <div class="alert alert-danger branch-invalid-alert" role="alert" style="display:none;">{% trans "Both dates required, and in the format YYYY-MM-DD" %}</div>
+                    <div id="edtf-date-alert" class="alert alert-danger branch-invalid-alert" role="alert" style="display:none;">{% trans "Both dates required, and in the format YYYY-MM-DD" %}</div>
                 </dl>
             </div>
         </div>

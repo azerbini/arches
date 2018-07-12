@@ -30,8 +30,8 @@ define(['jquery',
                             'DATE_INTERPRETATION_INFERENCE_MAKING_ACTOR_NAME.E41'
                         ]
                         var ck0 = this.validateHasValues(nodes, canBeEmpty);
-                        var ck1 = vt.isValidDate(nodes,'ARCHAEOLOGICAL_FROM_DATE.E61');
-                        var ck2 = vt.isValidDate(nodes,'ARCHAEOLOGICAL_TO_DATE.E61');
+                        var ck1 = vt.validateDateEdtfy(nodes,'ARCHAEOLOGICAL_FROM_DATE.E61');
+                        var ck2 = vt.validateDateEdtfy(nodes,'ARCHAEOLOGICAL_TO_DATE.E61');
                         return ck0 && ck1 && ck2;
                     }
                 }));

@@ -30,8 +30,11 @@ from arches.app.search.search_engine_factory import SearchEngineFactory
 from arches.app.search.elasticsearch_dsl_builder import Bool, Match, Query, Nested, Terms, GeoShape, Range
 from django.utils.translation import ugettext as _
 from arches.app.utils.data_management.resources.exporter import ResourceExporter
+from arches.app.utils.date_utils import get_year_from_int,date_to_int
 
 from arches.app.views.resources import get_related_resources
+
+
 
 import csv
 import logging
@@ -43,18 +46,58 @@ except ImportError:
     
 def home_page(request):
     lang = request.GET.get('lang', settings.LANGUAGE_CODE)
-    min_max_dates = models.Dates.objects.aggregate(Min('val'), Max('val'))
+    min_max_dates = get_min_max_extended_dates()
 
     return render_to_response('search.htm', {
             'main_script': 'search',
             'active_page': 'Search',
-            'min_date': min_max_dates['val__min'].year if min_max_dates['val__min'] != None else 0,
-            'max_date': min_max_dates['val__max'].year if min_max_dates['val__min'] != None else 1,
+            'min_date': min_max_dates['val__min'] if min_max_dates['val__min'] != None else 0,
+            'max_date': min_max_dates['val__max'] if min_max_dates['val__min'] != None else 1,
             'timefilterdata': JSONSerializer().serialize(Concept.get_time_filter_data()),
             'group_options': settings.SEARCH_GROUP_ROOTS
         }, 
         context_instance=RequestContext(request))
+def get_min_max_extended_dates():
 
+    se = SearchEngineFactory().create()
+
+    query = Query(se)
+    aggs = {
+        "extendeddates": {
+            "nested": {
+                "path": "extendeddates"
+            },
+            "aggs": {
+                "min_date": {
+                    "min": {
+                        "field": "extendeddates.value"
+                    }
+                },
+                "max_date": {
+                    "max": {
+                       "field": "extendeddates.value"
+                    }
+                }
+            }
+        }
+    }
+    
+    query._dsl['aggs'] = aggs
+    results = query.search(index='entity', doc_type='')
+    
+    if not results:
+        return {'val__min':None,'val__max':None}
+
+    min_date = results['aggregations']['extendeddates']['min_date']['value']
+    max_date = results['aggregations']['extendeddates']['max_date']['value']
+    
+    minyear = get_year_from_int(min_date)
+    maxyear = get_year_from_int(max_date)
+    
+    min_max_date = {'val__min':minyear,'val__max':maxyear}
+    
+    return min_max_date
+    
 def get_related_resource_ids(resourceids, lang, limit=1000, start=0):
     se = SearchEngineFactory().create()
     query = Query(se, limit=limit, start=start)
@@ -91,7 +134,8 @@ def search_results(request):
         
         ids_filter = Terms(field='entityid', terms=related_resources_from_prev_query)
         query.add_filter(ids_filter)
-        
+    import json
+    print json.dumps(query._dsl,indent=1)
     results = query.search(index='entity', doc_type='')
     
     total = results['hits']['total']
@@ -127,7 +171,6 @@ def build_search_results_dsl(request):
     boolfilter = Bool()
 
     query.dsl.update({'sort': sorting})
-
     return query
 
 def export_results(request):

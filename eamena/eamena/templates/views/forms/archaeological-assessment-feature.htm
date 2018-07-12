@@ -28,20 +28,17 @@
                     </div>
                 </div>
                 <div class="col-xs-6 form-section-input margin-top-5 add-padding-right">
-                    <div class="form-group datetimepicker">
-                        <div class="input-group">
-                            <input type="text" name="mydate" id="date-from" placeholder='{% trans "from (yyyy-mm-dd)" %}' class="form-control datepicker" data-date-format="YYYY-MM-DD" data-bind="{value: getEditedNode('ARCHAEOLOGICAL_FROM_DATE.E61', 'value')} ">
-                            <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
-                        </div>
+                    <div class="form-group">
+                        <input type="text" style="width:100%" id="date" placeholder="{% trans 'From' %}" class="form-control datepicker" data-bind="{value: getEditedNode('ARCHAEOLOGICAL_FROM_DATE.E61', 'value')} ">
                     </div>
                 </div>
                 <div class="col-xs-6 form-section-input margin-top-5">
-                    <div class="form-group datetimepicker">
-                        <div class="input-group">
-                            <input type="text" name="mydate" id="date-from" placeholder='{% trans "to (yyyy-mm-dd)" %}' class="form-control datepicker" data-date-format="YYYY-MM-DD" data-bind="{value: getEditedNode('ARCHAEOLOGICAL_TO_DATE.E61', 'value')} ">
-                            <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
-                        </div>
+                    <div class="form-group">
+                        <input type="text" style="width:100%" id="date" placeholder="{% trans 'To' %}" class="form-control datepicker" data-bind="{value: getEditedNode('ARCHAEOLOGICAL_TO_DATE.E61', 'value')} ">
                     </div>
+                </div>
+                <div class="col-xs-12 form-section-input margin-top-5">
+                    <p class="txt-color-blue">{% trans 'use "yyyy-mm-dd", "yyyy-mm", or "yyyy", and add "-" for BCE dates, e.g. "-12000"' %}</p>
                 </div>
                 <div class="col-xs-6 form-section-input margin-top-5 add-padding-right">
                     <div class="form-group">
@@ -81,7 +78,7 @@
         </div>
         <div class="row">
             <div class="col-xs-12 col-sm-9">
-                <div class="alert alert-danger branch-invalid-alert" role="alert" style="display:none;">{% trans "All values must be populated, and dates must be properly formatted (YYYY-MM-DD)." %}</div>
+                <div id="edtf-date-alert" class="alert alert-danger branch-invalid-alert" role="alert" style="display:none;">{% trans "All values must be populated, and dates must be properly formatted (YYYY-MM-DD)." %}</div>
             </div>
         </div>
         <div class="row">

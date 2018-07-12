@@ -75,6 +75,10 @@ class Command(BaseCommand):
             help='select new node name'),
         make_option('-n', '--node', action='store', dest='node',
             help='select resource type to remove'),
+        make_option('--resources', action='store_true', dest='resources',
+            help='indicate that the resources should be indexed'),
+        make_option('--concepts', action='store_true', dest='concepts',
+            help='indicate that the resources should be indexed'),
     )
 
     def handle(self, *args, **options):
@@ -116,7 +120,10 @@ class Command(BaseCommand):
             self.load_concept_scheme(package_name, options['source'])
 
         if options['operation'] == 'index_database':
-            self.index_database(package_name)
+            self.index_database(
+                resources=options['resources'],
+                concepts=options['concepts']
+            )
 
         if options['operation'] == 'export_resource_graphs':
             self.export_resource_graphs(package_name, options['dest_dir'])
@@ -381,12 +388,18 @@ class Command(BaseCommand):
         load = getattr(module, 'load_authority_files')
         load(data_source) 
 
-    def index_database(self, package_name):
+    def index_database(self,resources=False,concepts=False):
         """
         Runs the index_database command found in package_utils
         """
-        # self.setup_indexes(package_name)
-        index_database.index_db()
+        if resources:
+            index_database.index_resources()
+        elif concepts:
+            index_database.index_concepts()
+        ## this runs if neither is provided (a.k.a. index all)
+        else:
+            index_database.index_concepts()
+            index_database.index_resources()
 
     def export_resource_graphs(self, package_name, data_dest=None):
         """
