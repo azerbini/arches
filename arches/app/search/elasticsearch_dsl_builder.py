@@ -112,6 +112,15 @@ class Query(Dsl):
         #print self
         return self.se.search(index=index, doc_type=doc_type, body=self.dsl)
 
+    def scan(self, index='', doc_type='', **kwargs):
+        self.fields = kwargs.pop('fields', self.fields)
+        self.start = kwargs.pop('start', self.start)
+        self.limit = kwargs.pop('limit', self.limit)
+
+        self.prepare()
+        # print self
+        return self.se.scan(index=index, doc_type=doc_type, query=self.dsl)
+
     def delete(self, index=''):
         return self.se.delete(index=index, body=self.dsl)
 
