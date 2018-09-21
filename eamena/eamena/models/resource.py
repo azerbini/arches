@@ -148,7 +148,8 @@ class Resource(ArchesResource):
                 'name': _('Manage Resource'),
                 'forms': [
                     forms.EditHistory.get_info(),
-                    forms.DeleteResourceForm.get_info()
+                    # this is now added in the view if the user has appropriate permissions
+                    # forms.DeleteResourceForm.get_info()
                 ]
             })
             

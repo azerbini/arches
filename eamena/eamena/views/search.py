@@ -30,6 +30,10 @@ from arches.app.search.search_engine_factory import SearchEngineFactory
 from arches.app.search.elasticsearch_dsl_builder import Bool, Match, Query, Nested, Terms, GeoShape, Range
 from django.utils.translation import ugettext as _
 from arches.app.utils.data_management.resources.exporter import ResourceExporter
+from django.contrib.gis.geos import GEOSGeometry
+from django.core.exceptions import PermissionDenied
+from arches.app.utils.data_management.resources.exporter import ResourceExporter
+from eamena.models.group import canUserAccessResource
 
 from arches.app.views.resources import get_related_resources
 
@@ -93,6 +97,9 @@ def search_results(request):
         query.add_filter(ids_filter)
         
     results = query.search(index='entity', doc_type='')
+
+    for result in results['hits']['hits']:
+        result['can_edit'] = canUserAccessResource(request.user, result['_id'], 'edit')
     
     total = results['hits']['total']
     page = 1 if request.GET.get('page') == '' else int(request.GET.get('page', 1))
@@ -112,7 +119,7 @@ def search_results(request):
     
     return get_paginator(results, total, page, settings.SEARCH_ITEMS_PER_PAGE, all_entity_ids)
 
-def build_search_results_dsl(request):
+def build_search_results_dsl(request, action="view"):
     temporal_filters = JSONDeserializer().deserialize(request.GET.get('temporalFilter', None))
     sorting = {
 		"child_entities.label":  {
@@ -126,11 +133,38 @@ def build_search_results_dsl(request):
     query = build_base_search_results_dsl(request)  
     boolfilter = Bool()
 
+    # require the result to be within the user's area
+    locationfilter = Bool()
+
+    if action is 'export':
+        # User must be in the edit plus group to export resources
+        groups = request.user.groups.filter(name__startswith="editplus")
+    else:
+        groups = request.user.groups
+
+    for group in groups.all():
+        if group.geom:
+            geojson = group.geom.geojson
+            geojson_as_dict = JSONDeserializer().deserialize(geojson)
+            geoshape = GeoShape(field='geometries.value', type=geojson_as_dict['type'],
+                                coordinates=geojson_as_dict['coordinates'])
+
+            nested = Nested(path='geometries', query=geoshape)
+            locationfilter.should(nested)
+    boolfilter.must(locationfilter)
+
+    query.add_filter(locationfilter)
+
     query.dsl.update({'sort': sorting})
 
     return query
 
 def export_results(request):
+
+    if len(request.user.groups.filter(name='editplus').all()) < 1:
+        # user is not in the edit plus group
+        raise PermissionDenied
+
     dsl = build_search_results_dsl(request)
     
     search_related_resources = JSONDeserializer().deserialize(request.GET.get('searchRelatedResources'))

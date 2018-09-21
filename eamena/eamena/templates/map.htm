@@ -316,9 +316,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
                                     {% trans 'View Report' %}
                                 </button>
                             </a>
-                            
-                            <a href="javascript:void(0);" class="text-primary" target="_blank" data-bind="attr:{ href: selectedResource() ? 'resources/' +  selectedResource().entitytypeid + '/default/' + selectedResource().id : 'javascript:void(0);'}">
-                                <button type="button" class="btn btn-primary">
+
+                            <a href="javascript:void(0);" class="text-primary" target="_blank" data-bind="attr:{ href: selectedResource() && selectedResource().can_edit ? 'resources/' +  selectedResource().entitytypeid + '/default/' + selectedResource().id : 'javascript:void(0);'}">
+                                <button type="button" class="btn btn-primary" data-bind="visible: selectedResource() ? selectedResource().can_edit : false">
                                     {% trans 'Edit' %}
                                 </button>
                             </a>

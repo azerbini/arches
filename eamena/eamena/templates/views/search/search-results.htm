@@ -36,7 +36,7 @@
                     <!-- Sub-header -->
                     <ul class="list-inline up-ul">
                     {% if 'edit' in user.user_groups %}
-                        <li>
+                        <li data-bind="{visible: can_edit}">
                             <i class="arches-search-link fa fa-pencil"></i>&nbsp;
                             <a href="" data-bind="attr: {'href': 'resources/' +  entitytypeid + '/default/' + resourceid}" target="_blank"><span class="arches-search-link">{% trans "Edit" %}</span></a>
                         </li>

@@ -15,15 +15,19 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext, ugettext_lazy as _
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
+from eamena.eamena.models.group import EamenaAuthGroup
+from django.contrib.gis.admin import GeoModelAdmin
 
 csrf_protect_m = method_decorator(csrf_protect)
 sensitive_post_parameters_m = method_decorator(sensitive_post_parameters())
 
 
-class GroupAdmin(admin.ModelAdmin):
+class GroupAdmin(GeoModelAdmin):
     search_fields = ('name',)
     ordering = ('name',)
     filter_vertical = ('permissions',)
+    # openlayers_url = 'https://cdnjs.cloudflare.com/ajax/libs/openlayers/3.20.1/ol.js'
+    extra_js = ['js/admin_group.js']
 
     def formfield_for_manytomany(self, db_field, request=None, **kwargs):
         if db_field.name == 'permissions':

@@ -992,6 +992,29 @@ class Resource(Entity):
 
         return index_settings
 
+    def prepare_maplayer_index(self, create=False):
+        """
+        Creates the mappings for the maplayers index
+        """
+        index_settings = {
+            "mappings": {
+                "HERITAGE_RESOURCE_GROUP.E27": {
+                    "properties": {
+                        "geometry": {
+                            "type": "geo_shape"
+                        }
+                    }
+                }
+            }
+        }
+
+        if create:
+            se = SearchEngineFactory().create()
+            se.create_index(index='maplayers', body=index_settings, ignore=400)
+
+        return index_settings
+
+
     def prepare_resource_relations_index(self, create=False):
         """
         Creates the settings and mappings in Elasticsearch to support related resources

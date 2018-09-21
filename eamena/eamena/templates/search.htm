@@ -115,8 +115,8 @@
                     </button>
                     <ul class="dropdown-menu" role="menu">
                         <li><a href="javascript:void(0);" id="view-saved-searches">{% trans "View Popular Searches" %}</a></li>
+                        {% if 'editplus' in user.user_groups %}
                         <li class="divider"></li>
-                        {% if 'edit' in user.user_groups %}
                         <li><a class="dataexport" id="shp" href="" target="_blank">{% trans "Export results to .SHP" %}</a></li>
                         <li><a class="dataexport" id="csv" href="" target="_blank">{% trans "Export results to .CSV" %} </a></li>
                         <li><a class="dataexport" id="kml" href="" target="_blank">{% trans "Export results to .KML" %} </a></li>

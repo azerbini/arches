@@ -42,6 +42,7 @@ def index_resources():
         se.delete_index(index=index_type)
     se.delete(index='term', body='{"query":{"bool":{"must":[{"constant_score":{"filter":{"missing":{"field":"value.options.conceptid"}}}}],"must_not":[],"should":[]}}}')
 
+    Resource().prepare_maplayer_index(create=True)
     Resource().prepare_term_index(create=True)
 
     cursor = connection.cursor()

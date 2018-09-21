@@ -50,6 +50,7 @@ from django.core.exceptions import ObjectDoesNotExist
 class AuthGroup(models.Model):
     id = models.IntegerField(primary_key=True)
     name = models.CharField(unique=True, max_length=80)
+    geom = models.GeometryField()
     class Meta:
         db_table = u'auth_group'
 
