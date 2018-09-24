@@ -29,162 +29,15 @@ from arches.app.views.concept import get_preflabel_from_valueid
 from arches.app.views.concept import get_preflabel_from_conceptid
 from arches.app.views.resources import get_related_resources
 from arches.app.search.search_engine_factory import SearchEngineFactory
-from arches.app.search.elasticsearch_dsl_builder import Query, Terms, Bool, Match, Nested
-from django.contrib.gis.geos import GEOSGeometry
 import binascii
 from arches.app.utils.encrypt import Crypter
 from arches.app.utils.spatialutils import getdates
 from arches.app.utils.eamena_utils import validatedates
 from django.shortcuts import redirect
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponseNotFound
-from django.db.models import Max, Min
-from django.contrib.gis.geos import GEOSGeometry
-from django.contrib.auth.decorators import permission_required
-from django.views.decorators.csrf import csrf_exempt
-from arches.app.models.resource import Resource
-from arches.app.search.elasticsearch_dsl_builder import Query, Terms, Bool, Match, Nested, GeoShape
-from eamena.models import forms
 from eamena.models.group import canUserAccessResource
 
 import logging
-
-
-@permission_required('edit')
-@csrf_exempt
-def resource_manager(request, resourcetypeid='', form_id='default', resourceid=''):
-    can_edit = canUserAccessResource(request.user, resourceid, 'edit');
-    if not can_edit:
-        raise PermissionDenied
-
-    if resourceid != '':
-        resource = Resource(resourceid)
-    elif resourcetypeid != '':
-        resource = Resource({'entitytypeid': resourcetypeid})
-    if form_id == 'default':
-        form_id = resource.form_groups[0]['forms'][0]['id']
-
-    if canUserAccessResource(request.user, resourceid, 'delete'):
-        # add the delete form
-        manage_groups = [x for x in resource.form_groups if x['id'] == 'manage-resource']
-        if len(manage_groups) > 0:
-            manage_group = manage_groups[0]
-            manage_group['forms'].append(forms.DeleteResourceForm.get_info())
-    form = resource.get_form(form_id)
-    if request.method == 'DELETE':
-        if not canUserAccessResource(request.user, resourceid, 'delete'):
-            raise PermissionDenied
-
-        resource.delete_index()
-        se = SearchEngineFactory().create()
-        realtionships = resource.get_related_resources(return_entities=False)
-        for realtionship in realtionships:
-            se.delete(index='resource_relations', doc_type='all', id=realtionship.resourcexid)
-            realtionship.delete()
-        resource.delete()
-        return JSONResponse({'success': True})
-    if request.method == 'POST':
-        data = JSONDeserializer().deserialize(request.POST.get('formdata', {}))
-        form.update(data, request.FILES)
-        with transaction.atomic():
-            if resourceid != '':
-                resource.delete_index()
-            resource.save(user=request.user)
-            resource.index()
-            resourceid = resource.entityid
-            return redirect('resource_manager', resourcetypeid=resourcetypeid, form_id=form_id, resourceid=resourceid)
-    min_max_dates = models.Dates.objects.aggregate(Min('val'), Max('val'))
-
-    if request.method == 'GET':
-        if form != None:
-
-            lang = request.GET.get('lang', request.LANGUAGE_CODE)
-            form.load(lang)
-            return render_to_response('resource-manager.htm', {
-                'form': form,
-                'formdata': JSONSerializer().serialize(form.data),
-                'form_template': 'views/forms/' + form_id + '.htm',
-                'form_id': form_id,
-                'resourcetypeid': resourcetypeid,
-                'resourceid': resourceid,
-                'main_script': 'resource-manager',
-                'active_page': 'ResourceManger',
-                'resource': resource,
-                'resource_name': resource.get_primary_name(),
-                'resource_type_name': resource.get_type_name(),
-                'form_groups': resource.form_groups,
-                'min_date': min_max_dates['val__min'].year if min_max_dates['val__min'] != None else 0,
-                'max_date': min_max_dates['val__max'].year if min_max_dates['val__min'] != None else 1,
-                'timefilterdata': JSONSerializer().serialize(Concept.get_time_filter_data()),
-            },
-                                      context_instance=RequestContext(request))
-        else:
-            return HttpResponseNotFound('<h1>Arches form not found.</h1>')
-
-
-def map_layers(request, entitytypeid='all', get_centroids=False):
-    data = []
-    geom_param = request.GET.get('geom', None)
-    bbox = request.GET.get('bbox', '')
-    limit = request.GET.get('limit', settings.MAP_LAYER_FEATURE_LIMIT)
-    entityids = request.GET.get('entityid', '')
-    geojson_collection = {
-        "type": "FeatureCollection",
-        "features": []
-    }
-
-    se = SearchEngineFactory().create()
-    query = Query(se, limit=limit)
-    # filter based on user's group geometries
-    locationfilter = Bool()
-    for group in request.user.groups.all():
-        if group.geom:
-            geojson = group.geom.geojson
-            geojson_as_dict = JSONDeserializer().deserialize(geojson)
-            geoshape = GeoShape(field='geometry', type=geojson_as_dict['type'],
-                                coordinates=geojson_as_dict['coordinates'])
-            locationfilter.should(geoshape)
-
-    query.add_query(locationfilter)
-    args = {'index': 'maplayers'}
-    if entitytypeid != 'all':
-        args['doc_type'] = entitytypeid
-    if entityids != '':
-        for entityid in entityids.split(','):
-            record = se.search(index='maplayers', id=entityid)['_source']
-
-            # Set a param to indicate the user's permissions for this resource
-            record['properties']['can_edit'] = canUserAccessResource(request.user, record['id'], 'edit')
-
-            geojson_collection['features'].append(record)
-        return JSONResponse(geojson_collection)
-    data = query.search(**args)
-    for item in data['hits']['hits']:
-        if get_centroids:
-            item['_source']['geometry'] = item['_source']['properties']['centroid']
-            item['_source'].pop('properties', None)
-
-        elif geom_param != None:
-            item['_source']['geometry'] = item['_source']['properties'][geom_param]
-            item['_source']['properties'].pop('extent', None)
-            item['_source']['properties'].pop(geom_param, None)
-
-            # Set a param to indicate the user's permissions for this resource
-            # This may be expensive, but we are assuming there won't be large numbers of results here
-            can_edit = canUserAccessResource(request.user, item['_source']['id'], 'edit')
-            item['_source']['properties']['can_edit'] = can_edit
-
-        else:
-            item['_source']['properties'].pop('extent', None)
-            item['_source']['properties'].pop('centroid', None)
-
-            # Set a param to indicate the user's permissions for this resource
-            # This may be expensive, but we are assuming there won't be large numbers of results here
-            can_edit = canUserAccessResource(request.user, item['_source']['id'], 'edit')
-            item['_source']['properties']['can_edit'] = can_edit
-
-        geojson_collection['features'].append(item['_source'])
-    return JSONResponse(geojson_collection)
 
 
 def report(request, resourceid):
@@ -455,6 +308,7 @@ def report(request, resourceid):
             'related_resource_dict': related_resource_dict,
             'main_script': 'resource-report',
             'active_page': 'ResourceReport',
-            'BingDates': getdates(report_info['source']['geometry']) # Retrieving the dates of Bing Imagery
+            'BingDates': getdates(report_info['source']['geometry']), # Retrieving the dates of Bing Imagery
+            'can_edit': can_edit
         },
         context_instance=RequestContext(request))        

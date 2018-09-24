@@ -28,13 +28,16 @@ from arches.app.models.resource import Resource
 from arches.app.utils.betterJSONSerializer import JSONSerializer, JSONDeserializer
 from arches.app.utils.JSONResponse import JSONResponse
 from arches.app.search.search_engine_factory import SearchEngineFactory
-from arches.app.search.elasticsearch_dsl_builder import Query, Terms
+from arches.app.search.elasticsearch_dsl_builder import Query, Terms, Bool, GeoShape
 from arches.app.views.concept import get_preflabel_from_valueid
 from arches.app.models.concept import Concept
 from django.http import HttpResponseNotFound
 from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Max, Min
 from django.contrib.auth.decorators import user_passes_test
+from eamena.models import forms
+from eamena.models.group import canUserAccessResource
+from django.core.exceptions import PermissionDenied
 
 def report(request, resourceid):
     raise NotImplementedError('Reports are not yet implemented.')
@@ -42,6 +45,9 @@ def report(request, resourceid):
 @permission_required('edit')
 @csrf_exempt
 def resource_manager(request, resourcetypeid='', form_id='default', resourceid=''):
+    can_edit = canUserAccessResource(request.user, resourceid, 'edit');
+    if not can_edit:
+        raise PermissionDenied
 
     if resourceid != '':
         resource = Resource(resourceid)
@@ -51,9 +57,18 @@ def resource_manager(request, resourcetypeid='', form_id='default', resourceid='
     if form_id == 'default':
         form_id = resource.form_groups[0]['forms'][0]['id']
 
+    if canUserAccessResource(request.user, resourceid, 'delete'):
+        # add the delete form
+        manage_groups = [x for x in resource.form_groups if x['id'] == 'manage-resource']
+        if len(manage_groups) > 0:
+            manage_group = manage_groups[0]
+            manage_group['forms'].append(forms.DeleteResourceForm.get_info())
+
     form = resource.get_form(form_id)
 
     if request.method == 'DELETE':
+        if not canUserAccessResource(request.user, resourceid, 'delete'):
+            raise PermissionDenied
         resource.delete_index()
         se = SearchEngineFactory().create()
         realtionships = resource.get_related_resources(return_entities=False)
@@ -175,12 +190,27 @@ def map_layers(request, entitytypeid='all', get_centroids=False):
     se = SearchEngineFactory().create()
     query = Query(se, limit=limit)
 
+    # filter based on user's group geometries
+    locationfilter = Bool()
+    for group in request.user.groups.all():
+        if group.geom:
+            geojson = group.geom.geojson
+            geojson_as_dict = JSONDeserializer().deserialize(geojson)
+            geoshape = GeoShape(field='geometry', type=geojson_as_dict['type'],
+                                coordinates=geojson_as_dict['coordinates'])
+            locationfilter.should(geoshape)
+    query.add_query(locationfilter)
+
     args = { 'index': 'maplayers' }
     if entitytypeid != 'all':
         args['doc_type'] = entitytypeid
     if entityids != '':
         for entityid in entityids.split(','):
-            geojson_collection['features'].append(se.search(index='maplayers', id=entityid)['_source'])
+            record = se.search(index='maplayers', id=entityid)['_source']
+            # Set a param to indicate the user's permissions for this resource
+            record['properties']['can_edit'] = canUserAccessResource(request.user, record['id'], 'edit')
+
+            geojson_collection['features'].append(record)
         return JSONResponse(geojson_collection)
 
 
@@ -212,9 +242,19 @@ def map_layers(request, entitytypeid='all', get_centroids=False):
                 item['_source']['geometry'] = item['_source']['properties'][geom_param]
                 item['_source']['properties'].pop('extent', None)
                 item['_source']['properties'].pop(geom_param, None)
+
+                # Set a param to indicate the user's permissions for this resource
+                # This may be expensive, but we are assuming there won't be large numbers of results here
+                can_edit = canUserAccessResource(request.user, item['_source']['id'], 'edit')
+                item['_source']['properties']['can_edit'] = can_edit
             else:
                 item['_source']['properties'].pop('extent', None)
                 item['_source']['properties'].pop('centroid', None)
+
+                # Set a param to indicate the user's permissions for this resource
+                # This may be expensive, but we are assuming there won't be large numbers of results here
+                can_edit = canUserAccessResource(request.user, item['_source']['id'], 'edit')
+                item['_source']['properties']['can_edit'] = can_edit
             geojson_collection['features'].append(item['_source'])
 
     return JSONResponse(geojson_collection)
