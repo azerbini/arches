@@ -21,13 +21,14 @@ from django.conf import settings
 from django.template import RequestContext
 from django.shortcuts import render_to_response
 from arches.app.models import models
-from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import User
 from arches.app.utils.JSONResponse import JSONResponse
+from eamena.models.group import edit_group_check
 import json
 import logging
 
-@permission_required('edit')
+@user_passes_test(edit_group_check)
 def group_activity(request, groupid):
     user_ids = []
     ret_summary = {}

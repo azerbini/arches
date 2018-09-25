@@ -50,3 +50,11 @@ def canUserAccessResource(user, resourceid, action='view'):
                 return True;
 
     return False
+
+
+def edit_group_check(user):
+    return user.groups.filter(name__contains='edit')
+
+
+def editplus_group_check(user):
+    return user.groups.filter(name__contains='editplus')

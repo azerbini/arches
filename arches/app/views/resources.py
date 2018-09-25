@@ -20,7 +20,6 @@ import re
 from django.template import RequestContext
 from django.shortcuts import render_to_response, redirect
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.decorators import permission_required
 from django.conf import settings
 from django.db import transaction
 from arches.app.models import models
@@ -36,13 +35,13 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Max, Min
 from django.contrib.auth.decorators import user_passes_test
 from eamena.models import forms
-from eamena.models.group import canUserAccessResource
+from eamena.models.group import canUserAccessResource, edit_group_check
 from django.core.exceptions import PermissionDenied
 
 def report(request, resourceid):
     raise NotImplementedError('Reports are not yet implemented.')
 
-@permission_required('edit')
+@user_passes_test(edit_group_check)
 @csrf_exempt
 def resource_manager(request, resourcetypeid='', form_id='default', resourceid=''):
     can_edit = canUserAccessResource(request.user, resourceid, 'edit');

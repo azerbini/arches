@@ -22,13 +22,14 @@ from django.template import RequestContext
 from django.shortcuts import render_to_response
 from arches.app.models import models
 from arches.app.search.search_engine_factory import SearchEngineFactory
-from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.decorators import user_passes_test
 from arches.app.utils.JSONResponse import JSONResponse
 import json
 import logging
 from django.utils.translation import ugettext as _
+from eamena.models.group import edit_group_check
 
-@permission_required('edit')
+@user_passes_test(edit_group_check)
 def user_activity(request, userid):
     return render_to_response('user_activity.htm', {
             'userid': userid,

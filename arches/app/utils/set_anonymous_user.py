@@ -8,5 +8,4 @@ class SetAnonymousUser(object):
                 request.user = User.objects.get(username='anonymous')
             except:
                 pass
-            
-        request.user.user_groups = [group.name for group in request.user.groups.all()]
+        request.user.user_groups = ", ".join([group.name for group in request.user.groups.all()])
