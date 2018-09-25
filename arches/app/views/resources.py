@@ -35,7 +35,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Max, Min
 from django.contrib.auth.decorators import user_passes_test
 from eamena.models import forms
-from eamena.models.group import canUserAccessResource, edit_group_check
+from eamena.models.group import canUserAccessResource, edit_group_check, canUserCreateResource
 from django.core.exceptions import PermissionDenied
 
 def report(request, resourceid):
@@ -81,6 +81,10 @@ def resource_manager(request, resourcetypeid='', form_id='default', resourceid='
         data = JSONDeserializer().deserialize(request.POST.get('formdata', {}))
         form.set_user(request.user)
         form.update(data, request.FILES)
+
+        # Before saving the resource, need to check the location is within the group boundary (Can't use SE for this)
+        if not canUserCreateResource(request.user, resource):
+            raise PermissionDenied
 
         with transaction.atomic():
             if resourceid != '':

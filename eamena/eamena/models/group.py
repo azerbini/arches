@@ -25,6 +25,9 @@ def canUserAccessResource(user, resourceid, action='view'):
     action: either 'view', or 'edit'
     """
 
+    if resourceid == '':
+        return True
+
     # Get the geometry for resource
     se = SearchEngineFactory().create()
     report_info = se.search(index='resource', id=resourceid)
@@ -50,6 +53,35 @@ def canUserAccessResource(user, resourceid, action='view'):
                 return True;
 
     return False
+
+
+def canUserCreateResource(user, resource):
+    """Check if resource geometries are within the group edit boundary prior to saving resource"""
+    # first check if resource contains geometric data
+    geoments = []
+
+    for entity in resource.flatten():
+        if 'GEOM' in entity.entitytypeid:
+            geoments.append(GEOSGeometry(entity.value))
+
+    if len(geoments) == 0:
+        return True
+
+    passes = 0
+    for site_geom in geoments:
+        for group in user.groups.filter(name__startswith='edit'):
+            if group.geom:
+                group_geom = GEOSGeometry(group.geom)
+                if group_geom.contains(site_geom):
+                    passes += 1
+                    break
+
+    # Check that all of the input geometries are within an edit group
+    if passes == len(geoments):
+        return True
+
+    return False
+
 
 
 def edit_group_check(user):
