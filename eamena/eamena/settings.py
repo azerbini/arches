@@ -8,7 +8,7 @@ PACKAGE_ROOT = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfr
 PACKAGE_NAME = PACKAGE_ROOT.split(os.sep)[-1]
 
 ROOT_URLCONF = '%s.urls' % (PACKAGE_NAME)
-INSTALLED_APPS = INSTALLED_APPS + (PACKAGE_NAME, 'south', 'storages')
+INSTALLED_APPS = INSTALLED_APPS + (PACKAGE_NAME, 'south', 'storages', 'olwidget')
 STATICFILES_DIRS = (os.path.join(PACKAGE_ROOT, 'media'),) + STATICFILES_DIRS
 TEMPLATE_DIRS = (os.path.join(PACKAGE_ROOT, 'templates'),os.path.join(PACKAGE_ROOT, 'templatetags')) + TEMPLATE_DIRS
 LOCALE_PATHS = (os.path.join(PACKAGE_ROOT, '../locale'),)

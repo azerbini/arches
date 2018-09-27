@@ -15,19 +15,22 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext, ugettext_lazy as _
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
-from eamena.eamena.models.group import EamenaAuthGroup
-from django.contrib.gis.admin import GeoModelAdmin
+from olwidget.admin import GeoModelAdmin
 
 csrf_protect_m = method_decorator(csrf_protect)
 sensitive_post_parameters_m = method_decorator(sensitive_post_parameters())
 
 
 class GroupAdmin(GeoModelAdmin):
+    options = {
+        'layers': ['bing.AerialWithLabels', 'bing.Aerial', 'osm.mapnik'],
+        'default_lat': 29,
+        'default_lon': 15,
+    }
+
     search_fields = ('name',)
     ordering = ('name',)
     filter_vertical = ('permissions',)
-    # openlayers_url = 'https://cdnjs.cloudflare.com/ajax/libs/openlayers/3.20.1/ol.js'
-    extra_js = ['js/admin_group.js']
 
     def formfield_for_manytomany(self, db_field, request=None, **kwargs):
         if db_field.name == 'permissions':
@@ -37,6 +40,17 @@ class GroupAdmin(GeoModelAdmin):
             kwargs['queryset'] = qs.select_related('content_type')
         return super(GroupAdmin, self).formfield_for_manytomany(
             db_field, request=request, **kwargs)
+
+
+    def add_view(self, request, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['bingkey'] = settings.BING_KEY
+        return super(GroupAdmin, self).add_view(request, form_url, extra_context=extra_context)
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['bingkey'] = settings.BING_KEY
+        return super(GroupAdmin, self).change_view(request, object_id, form_url, extra_context=extra_context)
 
 
 class UserAdmin(admin.ModelAdmin):
