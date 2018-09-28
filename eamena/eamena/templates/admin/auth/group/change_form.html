@@ -1,5 +1,6 @@
 {% extends "admin/change_form.html" %}
 {% load i18n admin_urls %}
+{% load staticfiles %}
 
 {% block extrahead %}
   {{ block.super }}
@@ -8,6 +9,7 @@
 <script>
   var bingkey = "{{ bingkey }}";
 </script>
+  <script type="text/javascript" src="{% static 'js/admin_group.js' %}"></script>
 {% endblock %}
 
 
