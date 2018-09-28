@@ -16,17 +16,33 @@ from django.utils.translation import ugettext, ugettext_lazy as _
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
 from olwidget.admin import GeoModelAdmin
+from django import forms
+from olwidget.fields import MapField, EditableLayerField
 
 csrf_protect_m = method_decorator(csrf_protect)
 sensitive_post_parameters_m = method_decorator(sensitive_post_parameters())
 
 
-class GroupAdmin(GeoModelAdmin):
-    options = {
+class GroupAdminForm(forms.ModelForm):
+    geom = MapField([
+        EditableLayerField({'geometry': 'polygon', 'name': 'geom', 'isCollection': True}),
+    ], {
         'layers': ['bing.AerialWithLabels', 'bing.Aerial', 'osm.mapnik'],
         'default_lat': 29,
         'default_lon': 15,
-    }
+    }, template="olwidget/admin_olwidget.html")
+
+    def clean(self):
+        self.cleaned_data['geom'] = self.cleaned_data['geom'][0]
+        return self.cleaned_data
+
+    class Meta:
+        model = Group
+
+
+class GroupAdmin(GeoModelAdmin):
+
+    form = GroupAdminForm
 
     search_fields = ('name',)
     ordering = ('name',)

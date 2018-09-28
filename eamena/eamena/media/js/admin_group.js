@@ -68,7 +68,9 @@ django.jQuery( document ).ready(function() {
             }
 
             for (var i = 0; i < results.length; i++){
-                allfeatures.push(results[i]);
+                if (results[i].geometry.components) {
+                    allfeatures.push(results[i]);
+                }
             }
 
 
