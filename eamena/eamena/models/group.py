@@ -46,6 +46,13 @@ def canUserAccessResource(user, resourceid, action='view'):
         groups = groups.filter(name__startswith="editplus")
     site_geom = GEOSGeometry(geometry)
 
+    restrict_groups = user.groups.filter(name__startswith='restrict')
+    for group in restrict_groups.all():
+        if group.geom:
+            group_geom = GEOSGeometry(group.geom)
+            if group_geom.intersects(site_geom):
+                return False
+
     for group in groups.all():
         if group.geom:
             group_geom = GEOSGeometry(group.geom)
@@ -69,6 +76,12 @@ def canUserCreateResource(user, resource):
 
     passes = 0
     for site_geom in geoments:
+        for group in user.groups.filter(name__startswith='restrict'):
+            if group.geom:
+                group_geom = GEOSGeometry(group.geom)
+                if group_geom.intersects(site_geom):
+                    return False
+
         for group in user.groups.filter(name__startswith='edit'):
             if group.geom:
                 group_geom = GEOSGeometry(group.geom)

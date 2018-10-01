@@ -193,16 +193,33 @@ def map_layers(request, entitytypeid='all', get_centroids=False):
     se = SearchEngineFactory().create()
     query = Query(se, limit=limit)
 
+    boolfilter = Bool()
+
     # filter based on user's group geometries
     locationfilter = Bool()
     for group in request.user.groups.all():
+        if group.name.startswith('restrict'):
+            continue
         if group.geom:
             geojson = group.geom.geojson
             geojson_as_dict = JSONDeserializer().deserialize(geojson)
             geoshape = GeoShape(field='geometry', type=geojson_as_dict['type'],
                                 coordinates=geojson_as_dict['coordinates'])
             locationfilter.should(geoshape)
-    query.add_query(locationfilter)
+    boolfilter.must(locationfilter)
+
+    if request.user.groups.filter(name__startswith='restrict').all():
+        restrictedfilter = Bool()
+        for restrictedGroup in request.user.groups.filter(name__startswith='restrict').all():
+            if restrictedGroup.geom:
+                geojson = restrictedGroup.geom.geojson
+                geojson_as_dict = JSONDeserializer().deserialize(geojson)
+                geoshape = GeoShape(field='geometry', type=geojson_as_dict['type'],
+                                    coordinates=geojson_as_dict['coordinates'])
+                restrictedfilter.should(geoshape)
+        boolfilter.must_not(restrictedfilter)
+
+    query.add_query(boolfilter)
 
     args = { 'index': 'maplayers' }
     if entitytypeid != 'all':

@@ -143,6 +143,8 @@ def build_search_results_dsl(request, action="view"):
         groups = request.user.groups
 
     for group in groups.all():
+        if group.name.startswith('restrict'):
+            continue
         if group.geom:
             geojson = group.geom.geojson
             geojson_as_dict = JSONDeserializer().deserialize(geojson)
@@ -153,7 +155,20 @@ def build_search_results_dsl(request, action="view"):
             locationfilter.should(nested)
     boolfilter.must(locationfilter)
 
-    query.add_filter(locationfilter)
+    if groups.filter(name__startswith='restrict').all():
+        restrictedfilter = Bool()
+        for restrictedGroup in groups.filter(name__startswith='restrict').all():
+            if restrictedGroup.geom:
+                geojson = restrictedGroup.geom.geojson
+                geojson_as_dict = JSONDeserializer().deserialize(geojson)
+                geoshape = GeoShape(field='geometries.value', type=geojson_as_dict['type'],
+                                    coordinates=geojson_as_dict['coordinates'])
+
+                nested = Nested(path='geometries', query=geoshape)
+                restrictedfilter.should(nested)
+        boolfilter.must_not(restrictedfilter)
+
+    query.add_filter(boolfilter)
 
     query.dsl.update({'sort': sorting})
 
