@@ -57,7 +57,7 @@ def canUserAccessResource(user, resourceid, action='view'):
         if group.geom:
             group_geom = GEOSGeometry(group.geom)
             if group_geom.contains(site_geom):
-                return True;
+                return True
 
     return False
 
