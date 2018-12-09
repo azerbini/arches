@@ -624,7 +624,7 @@ def rename_entity_type(old_entitytype_id, new_entitytype_id):
             if relations:
                 for re in relations:                   
                     re.ruleid = models.Rules.objects.get(entitytypedomain=newentitytype, entitytyperange = r.entitytyperange)
-                    logging.warning("Changing type of relation from %s to %s", r.ruleid, re.ruleid)
+                    logging.warning("Changing type of relation from %s to %s", r.ruleid, re.ruleid_id)
                     re.save()
             
 
@@ -648,7 +648,7 @@ def rename_entity_type(old_entitytype_id, new_entitytype_id):
             if relations:
                 for re in relations:
                     re.ruleid = models.Rules.objects.get(entitytypedomain=r.entitytypedomain, entitytyperange = newentitytype)
-                    logging.warning("Changing type of relation from %s to %s", r.ruleid, re.ruleid)
+                    logging.warning("Changing type of relation from %s to %s", r.ruleid, re.ruleid_id)
                     re.save()
     # update the Mappings
     mappingsout = models.Mappings.objects.filter(entitytypeidfrom=old_entitytype_id)
