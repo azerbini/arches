@@ -542,7 +542,7 @@ def show_entity_structure(entity_type_id, verbose=False):
                 print " ",k,v
 
         steps = models.MappingSteps.objects.filter(ruleid=rule_to.ruleid)
-        print "  steps for rule {}".format(i+1,len(steps))
+        print "  steps for rule {}".format(len(steps))
 
     rules_from_entity = models.Rules.objects.filter(entitytypedomain=entity_type_id)
     print "-"*30
@@ -553,7 +553,7 @@ def show_entity_structure(entity_type_id, verbose=False):
             for k,v in vars(rule_from).iteritems():
                 print " ",k,v
         steps = models.MappingSteps.objects.filter(ruleid=rule_from.ruleid)
-        print "  steps for rule {}".format(i+1,len(steps))
+        print "  steps for rule {}".format(len(steps))
 
     mappings_to_entity = models.Mappings.objects.filter(entitytypeidto=entity_type_id)
     print "-"*30
@@ -602,6 +602,7 @@ def rename_entity_type(old_entitytype_id, new_entitytype_id):
     ## make, then you don't need to create it again. This could be handled better
     ## with an if statement, instead of using try/except, which isn't optimal. -AC
     steps_to_be_created = []
+    rules_to_be_created = []
     # update the Rules
     rulesout = models.Rules.objects.filter(entitytypedomain=old_entitytype_id)
     print "updating {} rulesout".format(len(rulesout))
@@ -619,6 +620,12 @@ def rename_entity_type(old_entitytype_id, new_entitytype_id):
                     'mappingid': step.mappingid,
                     'order': step.order
                 })
+            relations = models.Relations.objects.filter(ruleid = r)
+            if relations:
+                for re in relations:                   
+                    re.ruleid = models.Rules.objects.get(entitytypedomain=newentitytype, entitytyperange = r.entitytyperange)
+                    logging.warning("Changing type of relation from %s to %s", r.ruleid, re.ruleid)
+                    re.save()
             
 
     rulesin = models.Rules.objects.filter(entitytyperange=old_entitytype_id)
@@ -630,13 +637,19 @@ def rename_entity_type(old_entitytype_id, new_entitytype_id):
             r.save()
             print "success"
         except IntegrityError:
-            print "failed"
+            print "failed", r.entitytypedomain,r.entitytyperange
             for step in deleted_steps:
                 steps_to_be_created.append({
                     'ruleid': models.Rules.objects.get(entitytypedomain=r.entitytypedomain, entitytyperange = newentitytype),
                     'mappingid': step.mappingid,
                     'order': step.order
                 })
+            relations = models.Relations.objects.filter(ruleid = r)
+            if relations:
+                for re in relations:
+                    re.ruleid = models.Rules.objects.get(entitytypedomain=r.entitytypedomain, entitytyperange = newentitytype)
+                    logging.warning("Changing type of relation from %s to %s", r.ruleid, re.ruleid)
+                    re.save()
     # update the Mappings
     mappingsout = models.Mappings.objects.filter(entitytypeidfrom=old_entitytype_id)
     for m in mappingsout:
@@ -664,11 +677,11 @@ def rename_entity_type(old_entitytype_id, new_entitytype_id):
 
     ## print statement shows what the new EntityType object looks like
     show_entity_structure(new_entitytype_id, verbose = True)
-
-    remove_entitytypes_and_concepts([old_entitytype_id,new_entitytype_id])
+    remove_entitytypes_and_concepts([old_entitytype_id])
     cursor = connection.cursor()
     for step in steps_to_be_created:
         cursor.execute("INSERT INTO ontology.mapping_steps VALUES (%s,%s,%s)", [step['mappingid'].mappingid, step['ruleid'].ruleid, step['order']])
+
 
 def add_resource_relation(entityid1, entityid2, relationship_type_string):
     # find the relationship type
