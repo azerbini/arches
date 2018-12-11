@@ -41,7 +41,7 @@ from arches.app.utils.load_relations import LoadRelations,UnloadRelations
 import arches.management.commands.package_utils.update_schema as update_schema
 import arches.management.commands.package_utils.migrate_resources as migrate_resources
 from arches.management.commands.package_utils.resource_graphs import load_graphs
-from arches.management.commands.package_utils.validate_values import validate_values, find_unused_entity_types
+from arches.management.commands.package_utils.validate_values import validate_values, find_unused_entity_types, find_detached_entities
 import json
 
 class Command(BaseCommand):
@@ -52,7 +52,7 @@ class Command(BaseCommand):
     
     option_list = BaseCommand.option_list + (
         make_option('-o', '--operation', action='store', dest='operation', default='setup',
-            type='choice', choices=['setup', 'install', 'setup_db', 'start_elasticsearch', 'setup_elasticsearch', 'build_permissions', 'livereload', 'load_resources', 'remove_resources', 'load_concept_scheme', 'index_database','export_resource_graphs','export_resources','create_backlog', 'remove_resources_from_csv', 'legacy_fixer', 'load_relations', 'unload_relations', 'delete_indices', 'extend_ontology', 'migrate_resources', 'insert_actors', 'prune_ontology', 'prune_resource_graph', 'load_graphs', 'convert_resources', 'validate_values', 'find_unused_entity_types', 'rename_entity_type', 'insert_actors', 'node_to_csv', 'remove_concepts_from_csv'],
+            type='choice', choices=['setup', 'install', 'setup_db', 'start_elasticsearch', 'setup_elasticsearch', 'build_permissions', 'livereload', 'load_resources', 'remove_resources', 'load_concept_scheme', 'index_database','export_resource_graphs','export_resources','create_backlog', 'remove_resources_from_csv', 'legacy_fixer', 'load_relations', 'unload_relations', 'delete_indices', 'extend_ontology', 'migrate_resources', 'insert_actors', 'prune_ontology', 'prune_resource_graph', 'load_graphs', 'convert_resources', 'validate_values', 'find_unused_entity_types', 'find_detached_entities', 'rename_entity_type', 'insert_actors', 'node_to_csv', 'remove_concepts_from_csv', 'create_missing_relations'],
             help='Operation Type; ' +
             '\'setup\'=Sets up Elasticsearch and core database schema and code' + 
             '\'setup_db\'=Truncate the entire arches based db and re-installs the base schema' + 
@@ -79,7 +79,9 @@ class Command(BaseCommand):
         make_option('-c', '--concepts', action='store_true', dest='only_concepts',
             help='Select this option to remove only concepts when pruning'),
          make_option('-r', '--resource', action='store', dest='resource_type',
-            help='Select this option to remove a whole resource graph from the ontology'),       
+            help='Select this option to remove a whole resource graph from the ontology'),     
+         make_option('-n', '--node', action='store', dest='nodetype',
+            help='Select this option to reintroduce missing relations for a given node'),       
     )
 
     def handle(self, *args, **options):
@@ -160,12 +162,16 @@ class Command(BaseCommand):
             self.validate_values()
         if options['operation'] == 'find_unused_entity_types':
             self.find_unused_entity_types()
+        if options['operation'] == 'find_detached_entities':
+            self.find_detached_entities()
         if options['operation'] == 'rename_entity_type':
             self.rename_entity_type(options['oldtype'],options['newtype'])            
         if options['operation'] == 'insert_actors':
             self.insert_actors()           
         if options['operation'] == 'node_to_csv':
-            self.node_to_csv(options['node'],options['dest_dir'])             
+            self.node_to_csv(options['node'],options['dest_dir'])        
+        if options['operation'] == 'create_missing_relations':
+            self.create_missing_relations(options['nodetype'])            
     def setup(self, package_name):
         """
         Installs Elasticsearch into the package directory and 
@@ -478,6 +484,8 @@ class Command(BaseCommand):
         
     def find_unused_entity_types(self):
         find_unused_entity_types()
+    def find_detached_entities(self):
+        find_detached_entities()
     def rename_entity_type(self, oldtype, newtype):
         migrate_resources.rename_entity_type(oldtype,newtype)
     def insert_actors(self):
@@ -487,3 +495,6 @@ class Command(BaseCommand):
         
     def remove_concepts_from_csv(self, concepts_list):
         migrate_resources.remove_concept_list(concepts_list)
+        
+    def create_missing_relations(self, nodetype):
+        migrate_resources.create_missing_relations(nodetype)

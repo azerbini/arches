@@ -73,4 +73,29 @@ def find_unused_entity_types(settings=None):
         utils.write_to_file(os.path.join(settings.PACKAGE_ROOT, 'logs', 'unused_entity_types.txt'), '\n'.join(unused_types))
     else:
         print "No unused entity types found"
+        
+def find_detached_entities(settings=None):
+    if not settings:
+        from django.conf import settings
+    detached_entities = []
+    for entity in models.Entities.objects.iterator():
+        try:
+            entity_type = models.EntityTypes.objects.get(pk = entity.entitytypeid)
+            if not entity_type.isresource:
+                try:
+                    models.Relations.objects.get(entityidrange = entity.pk)
+                except:
+                    print entity.entityid
+                    detached_entities.append(entity.entityid)
+        except:
+            print entity.entityid
+            detached_entities.append(entity.entityid)
+    
+    if len(detached_entities):
+        print "Some detached entities were identified. See logs/detached_entites.txt"
+        utils.write_to_file(os.path.join(settings.PACKAGE_ROOT, 'logs', 'detached_entites.txt'), '')
+        utils.write_to_file(os.path.join(settings.PACKAGE_ROOT, 'logs', 'detached_entities.txt'), '\n'.join(detached_entities))
+    else:
+        print "No unused entity types found"
+
 
