@@ -744,3 +744,15 @@ def remove_concept_list(concepts):
                 except:
                     print "Conceptid %s does not exist" % concept_model
         
+        
+def create_missing_relations(nodetype):
+    entities = models.Entities.objects.filter(entitytypeid=nodetype).values_list("entityid", flat=True)
+    for e in entities:
+        try:
+            models.Relations.objects.get(entityidrange = e)
+        except:
+            print "Entity %s of type %s does not have a relation" % (e, nodetype)
+            rel_to_restore = models.Relations2.objects.get(entityidrange = e)
+            r =models.Relations(relationid =rel_to_restore.relationid, ruleid = rel_to_restore.ruleid, entityiddomain = rel_to_restore.entityiddomain, entityidrange = rel_to_restore.entityidrange)
+            r.save()
+        
