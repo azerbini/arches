@@ -640,3 +640,21 @@ class UniqueIds(models.Model):
     class Meta:
         db_table = u'uniqueids'
         get_latest_by = "order_date"
+
+class Relations2(models.Model):
+    relationid = models.AutoField(primary_key=True)
+    ruleid = models.ForeignKey('Rules', db_column='ruleid')
+    entityiddomain = models.ForeignKey('Entities', db_column='entityiddomain', related_name='rules_entityiddomain2')
+    entityidrange = models.ForeignKey('Entities', db_column='entityidrange', related_name='rules_entityidrange2')
+    notes = models.TextField()
+    class Meta:
+        db_table = u'data"."relations2'
+
+    def __unicode__(self):
+        return ('%s is the parent of %s') % (self.entityiddomain, self.entityidrange)
+
+    def save(self, *args, **kwargs):
+        if Relations.objects.filter(entityiddomain = self.entityiddomain, entityidrange = self.entityidrange).exclude(pk=self.pk).exists():
+            return # can't insert duplicate values
+        else:
+            super(Relations, self).save(*args, **kwargs) # Call the "real" save() method.
