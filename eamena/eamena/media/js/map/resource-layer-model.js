@@ -77,6 +77,7 @@ define([
             })
 
             if (config.entitytypeid !== null) {
+                $('.map-loading').show();
                 layerConfig.url = arches.urls.map_markers + config.entitytypeid;
                 
                 //fetch the raw geojson data and act on it
@@ -103,9 +104,6 @@ define([
                     }
                 })
             }
-            
-
-            $('.map-loading').show();
 
             var clusterStyle = function(feature, resolution) {
                 if(feature.get('features')) {

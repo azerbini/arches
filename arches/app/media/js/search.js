@@ -42,6 +42,7 @@ require(['jquery',
 
             initialize: function(options) {
                 var self = this;
+                myself = self;
                 var query = this.getQueryFromUrl();
                 if('termFilter' in query){
                     query.termFilter = JSON.parse(query.termFilter);
@@ -56,26 +57,6 @@ require(['jquery',
                 // searchboxes for advanced search should be at least one, even for a new search
                 this.initializeSearchBoxes();
 
-                this.mapFilter = new MapFilter({
-                    el: $('#map-filter-container')[0]
-                });
-                this.mapFilter.on('enabled', function(enabled, inverted){
-                    if(enabled){
-                        // this.termFilter[0].addTag(this.mapFilterText, inverted);
-                        $("#map-filter-button").addClass("enabled");
-                    }else{
-                        // this.termFilter[0].removeTag(this.mapFilterText);
-                        $("#map-filter-button").removeClass("enabled");
-                        // this.mapFilter.clear();
-                    }
-                    this.mapFilter.inverted = inverted;
-                    if(inverted){
-                        $("#map-filter-button").addClass("inverted");
-                    }else{
-                        $("#map-filter-button").removeClass("inverted");
-                    }
-                }, this);
-
                 this.booleanSearch = "and";
                 this.searchRelatedResources = false;
                 this.advancedSearch = false;
@@ -83,50 +64,39 @@ require(['jquery',
                 this.searchResults = new SearchResults({
                     el: $('#search-results-container')[0]
                 });
-                this.searchResults.on('mouseover', function(resourceid){
-                    this.mapFilter.selectFeatureById(resourceid);
-                }, this);
-                this.searchResults.on('mouseout', function(){
-                    this.mapFilter.unselectAllFeatures();
-                }, this);
-                this.searchResults.on('find_on_map', function(resourceid, data){
-                    var extent,
-                        expand = !this.mapFilter.expanded();
-                    if (expand) {
-                        this.mapFilter.expanded(true);
-                    }
-                    
-                    _.each(data.geometries, function (geometryData) {
-                        var geomExtent = wkt.readGeometry(geometryData.label).getExtent();
-                        geomExtent = ol.extent.applyTransform(geomExtent, ol.proj.getTransform('EPSG:4326', 'EPSG:3857'));
-                        extent = extent ? ol.extent.extend(extent, geomExtent) : geomExtent;
-                    });
-                    if (extent) {
-                        _.delay(function() {
-                            self.mapFilter.zoomToExtent(extent);
-                        }, expand ? 700 : 0);
-                    }
-                }, this);
 
-
-                this.mapFilterText = this.mapFilter.$el.data().filtertext;
                 this.timeFilterText = $('#time-filter-container-template').data().filtertext;
-                self.isNewQuery = true;
-                this.searchQuery = {
+                myself.isNewQuery = true;
+                myself.searchQuery = this.generateSearchQuery(false);
+                this.getSearchQuery();
+
+                this.searchResults.page.subscribe(function(){
+                    myself.doQuery();
+                });
+
+                myself.searchQuery.changed.subscribe(function(){
+                    myself.isNewQuery = true;
+                    myself.searchResults.page(1);
+                    myself.doQuery();
+                });
+            },
+
+            generateSearchQuery: function(hasmap) {
+                return {
                     queryString: function(){
-                        if (self.advancedSearch) {
+                        if (myself.advancedSearch) {
                             var termFilters = [];
                             var timeFilters = [];
                             var termFiltersLen = 0;
                             var timeFiltersLen = 0;
-                            var termFilterAndOr = self.termFilterAndOr;
-                            var termFilterCombineWithPrev = self.termFilterCombineWithPrev;
-                            var termFilterGroup = self.termFilterGroup;
-                            _.each(self.termFilter,function (term, i) {
+                            var termFilterAndOr = myself.termFilterAndOr;
+                            var termFilterCombineWithPrev = myself.termFilterCombineWithPrev;
+                            var termFilterGroup = myself.termFilterGroup;
+                            _.each(myself.termFilter,function (term, i) {
                                 termFiltersLen += term.query.filter.terms().length;
                                 termFilters.push(term.query.filter.terms());
-                            })
-                            _.each(self.timeFilter,function (timeFilter, i) {
+                            });
+                            _.each(myself.timeFilter,function (timeFilter, i) {
                                 timeFilters.push({
                                     year_min_max: timeFilter.query.filter.year_min_max(),
                                     filters: timeFilter.query.filter.filters(),
@@ -134,39 +104,51 @@ require(['jquery',
                                 });
                                 timeFiltersLen += timeFilter.query.filter.year_min_max().length;
                                 timeFiltersLen += timeFilter.query.filter.filters().length;
-                            })
+                            });
+                            var map = {};
+                            var mapexpanded = false;
+                            if(hasmap){
+                                var map = myself.mapFilter.query.filter;
+                                var mapexpanded = myself.mapFilter.expanded();
+                            }
                         } else {
-                            var termFilters = [self.termFilterSimple.query.filter.terms()];
-                            var termFiltersLen = self.termFilterSimple.query.filter.terms().length;
-                            var termFilterCombineWithPrev = [self.termFilterCombineWithPrev];
-                            var termFilterAndOr = [self.termFilterAndOrSimple];
-                            var termFilterGroup = [self.termFilterGroupSimple];
+                            var termFilters = [myself.termFilterSimple.query.filter.terms()];
+                            var termFiltersLen = myself.termFilterSimple.query.filter.terms().length;
+                            var termFilterCombineWithPrev = [myself.termFilterCombineWithPrev];
+                            var termFilterAndOr = [myself.termFilterAndOrSimple];
+                            var termFilterGroup = [myself.termFilterGroupSimple];
                             var timeFilters = [{
-                                year_min_max: self.timeFilterSimple.query.filter.year_min_max(),
-                                filters: self.timeFilterSimple.query.filter.filters(),
-                                inverted: self.timeFilterSimple.query.filter.inverted()
+                                year_min_max: myself.timeFilterSimple.query.filter.year_min_max(),
+                                filters: myself.timeFilterSimple.query.filter.filters(),
+                                inverted: myself.timeFilterSimple.query.filter.inverted()
                             }]
-                            termFiltersLen = self.timeFilterSimple.query.filter.year_min_max().length;
-                            timeFiltersLen += self.timeFilterSimple.query.filter.filters().length;
+                            termFiltersLen = myself.timeFilterSimple.query.filter.year_min_max().length;
+                            timeFiltersLen += myself.timeFilterSimple.query.filter.filters().length;
+                            var map = {};
+                            var mapexpanded = false;
+                            if(hasmap){
+                                var map = myself.mapFilter.query.filter;
+                                var mapexpanded = myself.mapFilter.expanded();
+                            }
                         }
                         var params = {
-                            page: self.searchResults.page(),
+                            page: myself.searchResults.page(),
                             termFilter: ko.toJSON(termFilters),
                             temporalFilter: ko.toJSON(timeFilters),
-                            spatialFilter: ko.toJSON(self.mapFilter.query.filter),
-                            mapExpanded: self.mapFilter.expanded(),
+                            spatialFilter: ko.toJSON(map),
+                            mapExpanded: mapexpanded,
                             timeExpanded: false,
-                            booleanSearch: self.booleanSearch,
-                            searchRelatedResources: self.searchRelatedResources,
+                            booleanSearch: myself.booleanSearch,
+                            searchRelatedResources: myself.searchRelatedResources,
                             termFilterAndOr: ko.toJSON(termFilterAndOr),
                             termFilterCombineWithPrev: ko.toJSON(termFilterCombineWithPrev),
                             termFilterGroup: ko.toJSON(termFilterGroup),
-                            advancedSearch: self.advancedSearch ? "true" : "false",
+                            advancedSearch: myself.advancedSearch ? "true" : "false",
                         };
-                        
+
                         if (termFiltersLen === 0 &&
                             timeFiltersLen === 0 &&
-                            self.mapFilter.query.filter.geometry.coordinates().length === 0) {
+                            myself.mapFilter.query.filter.geometry.coordinates().length === 0) {
                             params.no_filters = true;
                         }
 
@@ -175,27 +157,77 @@ require(['jquery',
                     },
                     changed: ko.pureComputed(function(){
                         var ret = ko.toJSON(this.timeFilterSimple.query.changed());
-                        _.each(self.timeFilter,function (timeFilter, i) {
+                        _.each(myself.timeFilter,function (timeFilter, i) {
                             ret = ret + ko.toJSON(timeFilter.query.changed());
-                        })
+                        });
                         ret = ret + ko.toJSON(this.termFilterSimple.query.changed());
-                        _.each(self.termFilter,function (termFilter, i) {
+                        _.each(myself.termFilter,function (termFilter, i) {
                             ret = ret + ko.toJSON(termFilter.query.changed());
-                        })
-                        ret = ret + ko.toJSON(this.mapFilter.query.changed());
+                        });
+                        if(hasmap) {
+                            ret = ret + ko.toJSON(myself.mapFilter.query.changed());
+                        }
                         return ret;
                     }, this).extend({ rateLimit: 200 })
                 };
-                this.getSearchQuery();
-                this.searchResults.page.subscribe(function(){
-                    self.doQuery();
+            },
+
+            initializeMapFilter: function() {
+                myself.mapFilter = new MapFilter({
+                    el: $('#map-filter-container')[0]
+                });
+                myself.mapFilter.on('enabled', function(enabled, inverted){
+                    if(enabled){
+                        // this.termFilter[0].addTag(this.mapFilterText, inverted);
+                        $("#map-filter-button").addClass("enabled");
+                    }else{
+                        // this.termFilter[0].removeTag(this.mapFilterText);
+                        $("#map-filter-button").removeClass("enabled");
+                        // this.mapFilter.clear();
+                    }
+                    myself.mapFilter.inverted = inverted;
+                    if(inverted){
+                        $("#map-filter-button").addClass("inverted");
+                    }else{
+                        $("#map-filter-button").removeClass("inverted");
+                    }
+                }, myself);
+                myself.mapFilterText = myself.mapFilter.$el.data().filtertext;
+
+
+                this.searchResults.on('mouseover', function(resourceid){
+                    myself.mapFilter.selectFeatureById(resourceid);
+                }, this);
+                this.searchResults.on('mouseout', function(){
+                    myself.mapFilter.unselectAllFeatures();
+                }, this);
+                this.searchResults.on('find_on_map', function(resourceid, data){
+                    var extent,
+                        expand = !this.mapFilter.expanded();
+                    if (expand) {
+                        this.mapFilter.expanded(true);
+                    }
+
+                    _.each(data.geometries, function (geometryData) {
+                        var geomExtent = wkt.readGeometry(geometryData.label).getExtent();
+                        geomExtent = ol.extent.applyTransform(geomExtent, ol.proj.getTransform('EPSG:4326', 'EPSG:3857'));
+                        extent = extent ? ol.extent.extend(extent, geomExtent) : geomExtent;
+                    });
+                    if (extent) {
+                        _.delay(function() {
+                            myself.mapFilter.zoomToExtent(extent);
+                        }, expand ? 700 : 0);
+                    }
+                }, this);
+
+                myself.searchQuery = this.generateSearchQuery(true);
+
+                myself.searchQuery.changed.subscribe(function(){
+                    myself.isNewQuery = true;
+                    myself.searchResults.page(1);
+                    myself.doQuery();
                 });
 
-                this.searchQuery.changed.subscribe(function(){
-                    self.isNewQuery = true;
-                    self.searchResults.page(1);
-                    self.doQuery();
-                });
             },
             
 
@@ -215,8 +247,10 @@ require(['jquery',
                     data: queryString,
                     success: function(results){
                         var data = self.searchResults.updateResults(results);
-                        self.mapFilter.highlightFeatures(data, $('.search-result-all-ids').data('results'));
-                        self.mapFilter.applyBuffer();
+                        if(self.mapFilter){
+                            self.mapFilter.highlightFeatures(data, $('.search-result-all-ids').data('results'));
+                            self.mapFilter.applyBuffer();
+                        }
                         self.isNewQuery = false;
                         $('.loading-mask').hide();
                     },
@@ -239,6 +273,10 @@ require(['jquery',
 
             // clickMapFilter opens map filter if closed, toggles the invert map filter if open
             clickMapFilter: function () {
+                if(this.mapFilter == null) {
+                    this.initializeMapFilter();
+                    this.doQuery();
+                }
                 if($('#saved-searches').is(":visible")){
                     this.isNewQuery = true;
                     this.doQuery();
@@ -500,8 +538,11 @@ require(['jquery',
                     query.mapExpanded = JSON.parse(query.mapExpanded);
                     doQuery = true;
                 }
-                this.mapFilter.restoreState(query.spatialFilter, query.mapExpanded);
-                
+
+                if(myself.mapFilter) {
+                    // This is unlikely to ever be called as the mapfilter isn't available on first load
+                    myself.mapFilter.restoreState(query.spatialFilter, query.mapExpanded);
+                }
 
                 if(doQuery){
                     this.isNewQuery = true;
